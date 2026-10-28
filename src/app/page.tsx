@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Scene3D from "../components/Scene3D";
 
 const SUPABASE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/awi_data?select=*&order=id.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`;
+const LOGGER_URL = `${process.env.NEXT_PUBLIC_LOGGER_SUPABASE_URL}/rest/v1/logger_data?select=*&order=received_at.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_LOGGER_SUPABASE_ANON_KEY}`;
 
 export default function Home() {
   const [awosData, setAwosData] = useState<any>({
@@ -13,6 +14,29 @@ export default function Home() {
     lastUpdate: "Menghubungkan ke database AWOS...",
     hour: 12,
   });
+
+  const [sunshineDur, setSunshineDur] = useState<number | string>("-");
+  const fetchLoggerData = async () => {
+    try {
+      const res = await fetch(LOGGER_URL);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        setSunshineDur(data[0].sunshine_dur);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil data logger:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchLoggerData();
+    const interval = setInterval(() => {
+      fetchData();
+      fetchLoggerData();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [resetCamera, setResetCamera] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -162,6 +186,16 @@ export default function Home() {
                   &gt;20
                 </div>
               </div>
+            </div>
+
+            {/* SUNSHINE DURATION*/}
+            <div className="-ml-2 bg-black/50 backdrop-blur-md border border-white/10 p-3 rounded-2xl flex items-center gap-3">
+              <p className="text-[12px] text-gray-300 uppercase">
+                Sunshine Duration (min)
+              </p>
+              <span className="font-mono text-sm font-bold text-yellow-400">
+                {sunshineDur}
+              </span>
             </div>
           </div>
 
