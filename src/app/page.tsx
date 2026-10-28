@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Scene3D from "../components/Scene3D";
 
 const SUPABASE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/awi_data?select=*&order=id.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`;
-const LOGGER_URL = `${process.env.NEXT_PUBLIC_LOGGER_SUPABASE_URL}/rest/v1/logger_data?select=*&order=received_at.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_LOGGER_SUPABASE_ANON_KEY}`;
+const LOGGER_URL = `${process.env.ASRS_LOGGER_SUPABASE_URL}/rest/v1/logger_data?select=*&order=received_at.desc&limit=1&apikey=${process.env.ASRS_LOGGER_SUPABASE_ANON_KEY}`;
 
 export default function Home() {
   const [awosData, setAwosData] = useState<any>({
