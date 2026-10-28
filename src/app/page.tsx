@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Scene3D from "../components/Scene3D";
 
-const SUPABASE_URL =
-  "https://ybzwadgobfelfultdqwk.supabase.co/rest/v1/awi_data?select=*&order=id.desc&limit=1&apikey=sb_publishable_aB3l-jP9dqUcNZcIXEOhBQ_EvpOVsaM";
+const SUPABASE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/awi_data?select=*&order=id.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`;
 
 export default function Home() {
   const [awosData, setAwosData] = useState<any>({
