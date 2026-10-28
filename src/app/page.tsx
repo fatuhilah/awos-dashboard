@@ -131,7 +131,7 @@ export default function Home() {
                 AWOS DASHBOARD
               </h1>
               <div className="flex items-center gap-3 text-xs text-gray-300 font-mono mt-1">
-                <p>UPDATE: {awosData.lastUpdate} UTC</p>
+                <p>UPDATE: {awosData.lastUpdate} WITA</p>
 
                 {/* Indikator LIVE Modern (Biru) */}
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.2)]">
