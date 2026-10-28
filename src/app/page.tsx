@@ -191,7 +191,7 @@ export default function Home() {
             {/* SUNSHINE DURATION*/}
             <div className="-ml-2 bg-black/50 backdrop-blur-md border border-white/10 p-3 rounded-2xl flex items-center gap-3">
               <p className="text-[12px] text-gray-300 uppercase">
-                Sunshine Duration (min)
+                Sunshine Duration
               </p>
               <span className="font-mono text-sm font-bold text-yellow-400">
                 {sunshineDur}
