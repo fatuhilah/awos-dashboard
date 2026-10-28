@@ -7,6 +7,7 @@ const SUPABASE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/awi_data?s
 const LOGGER_URL = `${process.env.NEXT_PUBLIC_ASRS_LOGGER_SUPABASE_URL}/rest/v1/logger_data?select=*&order=received_at.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_ASRS_LOGGER_SUPABASE_ANON_KEY}`;
 
 export default function Home() {
+  const [droneMode, setDroneMode] = useState(false);
   const [awosData, setAwosData] = useState<any>({
     site04: {},
     mid: {},
@@ -143,6 +144,7 @@ export default function Home() {
         awosData={awosData}
         resetCameraTrigger={resetCamera}
         hour={awosData.hour}
+        droneMode={droneMode}
       />
 
       {/* UI OVERLAY */}
@@ -170,6 +172,13 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <div
+              id="compass-hud"
+              className="bg-black/80 backdrop-blur-md border border-white/20 text-[#00ffcc] px-4 py-2 rounded-xl font-mono text-lg font-bold shadow-lg min-w-32.5 flex justify-center items-center"
+            >
+              Arah: 0°
             </div>
 
             {/* LEGENDA ANGIN */}
@@ -212,14 +221,26 @@ export default function Home() {
             >
               N
             </button>
+            <button
+              onClick={() => setDroneMode(!droneMode)}
+              className={`px-4 py-2 border rounded-xl font-bold text-xs transition ${
+                droneMode
+                  ? "bg-red-600 text-white border-red-500 hover:bg-red-700"
+                  : "bg-blue-600/80 text-white border-blue-500 hover:bg-blue-700"
+              }`}
+            >
+              {droneMode ? "EXIT DRONE" : "DRONE MODE"}
+            </button>
           </div>
         </div>
 
         {/* LIGHTNING WARNING BANNER */}
         {hasLightning && (
-          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 backdrop-blur-md border border-red-400 text-white px-8 py-3 rounded-full animate-pulse shadow-[0_0_20px_rgba(255,0,0,0.6)] font-bold flex items-center gap-3 pointer-events-auto">
-            <span className="text-2xl">⚡</span>
-            <span className="tracking-widest">WARNING: {combinedLtx}</span>
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 backdrop-blur-md border border-red-400 text-white px-5 py-1.5 rounded-full animate-pulse shadow-[0_0_10px_rgba(255,0,0,0.6)] font-bold flex items-center gap-1 pointer-events-auto">
+            <span className="text-lg">⚡</span>
+            <span className="tracking-widest text-sm">
+              WARNING: {combinedLtx}
+            </span>
           </div>
         )}
 

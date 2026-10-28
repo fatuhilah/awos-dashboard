@@ -7,15 +7,16 @@ import {
   Text,
   Cloud,
   Clouds,
-  Html,
+  useGLTF,
 } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 interface SceneProps {
   awosData: any;
   resetCameraTrigger: number;
   hour: number;
+  droneMode?: boolean;
 }
 
 function CameraController({ resetTrigger }: { resetTrigger: number }) {
@@ -43,43 +44,201 @@ function CameraController({ resetTrigger }: { resetTrigger: number }) {
 
 function CompassHUD() {
   const { camera } = useThree();
-  const divRef = useRef<HTMLDivElement>(null);
 
   useFrame(() => {
-    if (divRef.current) {
+    const hudElement = document.getElementById("compass-hud");
+
+    if (hudElement) {
       const dir = new THREE.Vector3();
       camera.getWorldDirection(dir);
 
       let angle = Math.atan2(dir.x, -dir.z) * (180 / Math.PI);
       if (angle < 0) angle += 360;
 
-      divRef.current.innerText = `Arah: ${Math.round(angle)}°`;
+      const roundedAngle = Math.round(angle);
+
+      // Array arah mata angin berjarak setiap 45 derajat
+      const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+      // Hitung index array berdasarkan derajat (0-7)
+      const dirIndex = Math.round(angle / 45) % 8;
+      const compassString = directions[dirIndex];
+
+      // Ubah angka 0 menjadi 360 khusus untuk arah Utara
+      const displayAngle = roundedAngle === 0 ? 360 : roundedAngle;
+
+      // Update teks secara langsung
+      hudElement.innerText = `Arah: ${displayAngle}° (${compassString})`;
     }
   });
 
+  // Tidak lagi menggunakan <Html>
+  return null;
+}
+
+function useKeyboard() {
+  const [keys, setKeys] = useState<{ [key: string]: boolean }>({});
+  useEffect(() => {
+    const down = (e: KeyboardEvent) =>
+      setKeys((k) => ({ ...k, [e.code]: true }));
+    const up = (e: KeyboardEvent) =>
+      setKeys((k) => ({ ...k, [e.code]: false }));
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+  return keys;
+}
+
+// Komponen Drone Terbang
+function DroneInspector({ awosData }: { awosData: any }) {
+  const droneRef = useRef<THREE.Group>(null);
+  const keys = useKeyboard();
+  const { camera } = useThree();
+  const { scene } = useGLTF("/drone.glb");
+
+  const controlsRef = useRef<any>(null);
+  const prevPos = useRef(new THREE.Vector3(0, 10, 80));
+
+  // Deteksi apakah user sedang menekan tombol kendali
+  const isMoving =
+    keys["KeyW"] ||
+    keys["KeyS"] ||
+    keys["KeyA"] ||
+    keys["KeyD"] ||
+    keys["Space"] ||
+    keys["ShiftLeft"];
+
+  useEffect(() => {
+    camera.position.set(0, 15, 100);
+    if (controlsRef.current) {
+      controlsRef.current.target.set(0, 10, 80);
+      controlsRef.current.update();
+    }
+  }, [camera]);
+
+  useFrame((_, delta) => {
+    if (!droneRef.current) return;
+    const speed = 40 * delta;
+    const rotSpeed = 2 * delta;
+
+    // Kontrol pergerakan
+    if (keys["KeyW"]) droneRef.current.translateZ(-speed);
+    if (keys["KeyS"]) droneRef.current.translateZ(speed);
+    if (keys["KeyA"]) droneRef.current.rotation.y += rotSpeed;
+    if (keys["KeyD"]) droneRef.current.rotation.y -= rotSpeed;
+    if (keys["Space"]) droneRef.current.position.y += speed;
+    if (keys["ShiftLeft"]) droneRef.current.position.y -= speed;
+
+    // Batasan Area
+    const minY = 1;
+    const maxY = 200;
+    const limitX = 600;
+    const limitZ = 600;
+    if (droneRef.current.position.y < minY) droneRef.current.position.y = minY;
+    if (droneRef.current.position.y > maxY) droneRef.current.position.y = maxY;
+    if (droneRef.current.position.x < -limitX)
+      droneRef.current.position.x = -limitX;
+    if (droneRef.current.position.x > limitX)
+      droneRef.current.position.x = limitX;
+    if (droneRef.current.position.z < -limitZ)
+      droneRef.current.position.z = -limitZ;
+    if (droneRef.current.position.z > limitZ)
+      droneRef.current.position.z = limitZ;
+
+    // Efek angin
+    const droneZ = droneRef.current.position.z;
+    let curDir = awosData?.mid?.wd || 40;
+    let curSpeed = awosData?.mid?.ws || 0;
+    if (droneZ > 0) {
+      const f = Math.min(droneZ / 110, 1);
+      curDir = THREE.MathUtils.lerp(
+        awosData?.mid?.wd || 40,
+        awosData?.site04?.wd || 40,
+        f,
+      );
+      curSpeed = THREE.MathUtils.lerp(
+        awosData?.mid?.ws || 0,
+        awosData?.site04?.ws || 0,
+        f,
+      );
+    } else {
+      const f = Math.min(-droneZ / 110, 1);
+      curDir = THREE.MathUtils.lerp(
+        awosData?.mid?.wd || 40,
+        awosData?.site22?.wd || 40,
+        f,
+      );
+      curSpeed = THREE.MathUtils.lerp(
+        awosData?.mid?.ws || 0,
+        awosData?.site22?.ws || 0,
+        f,
+      );
+    }
+    if (curSpeed > 5) {
+      const toRad = THREE.MathUtils.degToRad(curDir + 180);
+      const pushForce =
+        curSpeed * 0.5 * delta +
+        (Math.random() - 0.5) * (curSpeed * 0.1 * delta);
+      droneRef.current.position.x += Math.sin(toRad) * pushForce;
+      droneRef.current.position.z -= Math.cos(toRad) * pushForce;
+    }
+
+    // LOGIKA KAMERA HYBRID
+    const dronePos = droneRef.current.position;
+
+    if (isMoving) {
+      // 1. SAAT TERBANG: Kamera otomatis kembali ke belakang (Aturan Awal)
+      const droneRot = droneRef.current.rotation.y;
+      const cameraOffset = new THREE.Vector3(
+        Math.sin(droneRot) * 15,
+        8,
+        Math.cos(droneRot) * 15,
+      );
+      const targetCameraPos = dronePos.clone().add(cameraOffset);
+
+      camera.position.lerp(targetCameraPos, 0.1);
+      camera.lookAt(dronePos);
+
+      // Sinkronkan target OrbitControls diam-diam agar tidak loncat saat tombol dilepas
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(dronePos);
+      }
+    } else {
+      // 2. SAAT BERHENTI: Kamera bebas diorbit (terseret jika ada angin)
+      const displacement = dronePos.clone().sub(prevPos.current);
+      camera.position.add(displacement);
+
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(dronePos);
+        controlsRef.current.update();
+      }
+    }
+
+    prevPos.current.copy(dronePos);
+  });
+
   return (
-    <Html fullscreen style={{ pointerEvents: "none", zIndex: 10 }}>
-      <div
-        ref={divRef}
-        style={{
-          position: "absolute",
-          top: "18px",
-          right: "200px",
-          backgroundColor: "rgba(0, 0, 0, 0.6)",
-          color: "#00ffcc",
-          padding: "10px 20px",
-          borderRadius: "8px",
-          fontFamily: "monospace",
-          fontSize: "18px",
-          fontWeight: "bold",
-          border: "1px solid rgba(255,255,255,0.2)",
-        }}
-      >
-        Arah: 0°
-      </div>
-    </Html>
+    <>
+      <group ref={droneRef} position={[0, 10, 80]}>
+        <primitive object={scene} scale={4} />
+      </group>
+      <OrbitControls
+        ref={controlsRef}
+        enabled={!isMoving} // Otomatis mengunci kursor saat Anda mulai menekan tombol terbang
+        enablePan={false}
+        minDistance={5}
+        maxDistance={80}
+        maxPolarAngle={Math.PI / 2 - 0.02}
+      />
+    </>
   );
 }
+
+useGLTF.preload("/drone.glb");
 
 // TOWER AWOS
 function AwosTower({
@@ -311,6 +470,7 @@ export default function Scene3D({
   awosData,
   resetCameraTrigger,
   hour,
+  droneMode,
 }: SceneProps) {
   const isNight = hour >= 18 || hour < 6;
   const isMorning = hour >= 6 && hour < 10;
@@ -335,7 +495,11 @@ export default function Scene3D({
   return (
     <div className="absolute inset-0 z-0">
       <Canvas camera={{ position: [0, 80, 150], fov: 50 }}>
-        <CameraController resetTrigger={resetCameraTrigger} />
+        {/* Matikan OrbitControls jika Drone sedang aktif */}
+        {!droneMode && <CameraController resetTrigger={resetCameraTrigger} />}
+
+        {/* Render Drone HANYA jika droneMode aktif */}
+        {droneMode && <DroneInspector awosData={awosData} />}
 
         <CompassHUD />
 
