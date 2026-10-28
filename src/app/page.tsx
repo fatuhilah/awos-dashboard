@@ -10,7 +10,7 @@ export default function Home() {
     site04: {},
     mid: {},
     site22: {},
-    lastUpdate: "Menghubungkan ke satelit...",
+    lastUpdate: "Menghubungkan ke database AWOS...",
     hour: 12,
   });
 
