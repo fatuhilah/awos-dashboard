@@ -56,23 +56,15 @@ function CompassHUD() {
       if (angle < 0) angle += 360;
 
       const roundedAngle = Math.round(angle);
-
-      // Array arah mata angin berjarak setiap 45 derajat
       const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-
-      // Hitung index array berdasarkan derajat (0-7)
       const dirIndex = Math.round(angle / 45) % 8;
       const compassString = directions[dirIndex];
-
-      // Ubah angka 0 menjadi 360 khusus untuk arah Utara
       const displayAngle = roundedAngle === 0 ? 360 : roundedAngle;
 
-      // Update teks secara langsung
       hudElement.innerText = `Arah: ${displayAngle}° (${compassString})`;
     }
   });
 
-  // Tidak lagi menggunakan <Html>
   return null;
 }
 
@@ -93,7 +85,6 @@ function useKeyboard() {
   return keys;
 }
 
-// Komponen Drone Terbang
 function DroneInspector({ awosData }: { awosData: any }) {
   const droneRef = useRef<THREE.Group>(null);
   const keys = useKeyboard();
@@ -103,7 +94,6 @@ function DroneInspector({ awosData }: { awosData: any }) {
   const controlsRef = useRef<any>(null);
   const prevPos = useRef(new THREE.Vector3(0, 10, 80));
 
-  // Deteksi apakah user sedang menekan tombol kendali
   const isMoving =
     keys["KeyW"] ||
     keys["KeyS"] ||
@@ -125,7 +115,6 @@ function DroneInspector({ awosData }: { awosData: any }) {
     const speed = 40 * delta;
     const rotSpeed = 2 * delta;
 
-    // Kontrol pergerakan
     if (keys["KeyW"]) droneRef.current.translateZ(-speed);
     if (keys["KeyS"]) droneRef.current.translateZ(speed);
     if (keys["KeyA"]) droneRef.current.rotation.y += rotSpeed;
@@ -133,7 +122,6 @@ function DroneInspector({ awosData }: { awosData: any }) {
     if (keys["Space"]) droneRef.current.position.y += speed;
     if (keys["ShiftLeft"]) droneRef.current.position.y -= speed;
 
-    // Batasan Area
     const minY = 1;
     const maxY = 200;
     const limitX = 600;
@@ -149,7 +137,6 @@ function DroneInspector({ awosData }: { awosData: any }) {
     if (droneRef.current.position.z > limitZ)
       droneRef.current.position.z = limitZ;
 
-    // Efek angin
     const droneZ = droneRef.current.position.z;
     let curDir = awosData?.mid?.wd || 40;
     let curSpeed = awosData?.mid?.ws || 0;
@@ -187,11 +174,9 @@ function DroneInspector({ awosData }: { awosData: any }) {
       droneRef.current.position.z -= Math.cos(toRad) * pushForce;
     }
 
-    // LOGIKA KAMERA HYBRID
     const dronePos = droneRef.current.position;
 
     if (isMoving) {
-      // 1. SAAT TERBANG: Kamera otomatis kembali ke belakang (Aturan Awal)
       const droneRot = droneRef.current.rotation.y;
       const cameraOffset = new THREE.Vector3(
         Math.sin(droneRot) * 15,
@@ -199,16 +184,13 @@ function DroneInspector({ awosData }: { awosData: any }) {
         Math.cos(droneRot) * 15,
       );
       const targetCameraPos = dronePos.clone().add(cameraOffset);
-
       camera.position.lerp(targetCameraPos, 0.1);
       camera.lookAt(dronePos);
 
-      // Sinkronkan target OrbitControls diam-diam agar tidak loncat saat tombol dilepas
       if (controlsRef.current) {
         controlsRef.current.target.copy(dronePos);
       }
     } else {
-      // 2. SAAT BERHENTI: Kamera bebas diorbit (terseret jika ada angin)
       const displacement = dronePos.clone().sub(prevPos.current);
       camera.position.add(displacement);
 
@@ -217,7 +199,6 @@ function DroneInspector({ awosData }: { awosData: any }) {
         controlsRef.current.update();
       }
     }
-
     prevPos.current.copy(dronePos);
   });
 
@@ -228,7 +209,7 @@ function DroneInspector({ awosData }: { awosData: any }) {
       </group>
       <OrbitControls
         ref={controlsRef}
-        enabled={!isMoving} // Otomatis mengunci kursor saat Anda mulai menekan tombol terbang
+        enabled={!isMoving}
         enablePan={false}
         minDistance={5}
         maxDistance={80}
@@ -238,7 +219,136 @@ function DroneInspector({ awosData }: { awosData: any }) {
   );
 }
 
-useGLTF.preload("/drone.glb");
+// KOMPONEN MODEL BANGUNAN
+
+// Fungsi helper untuk memperbaiki rotasi, skala, dan material gelap dari GLB
+function fixGLB(scene: THREE.Group) {
+  const clone = scene.clone();
+  clone.traverse((child: any) => {
+    if (child.isMesh && child.material) {
+      // Kurangi sifat metalik agar tidak memantulkan warna hitam dari void
+      child.material.metalness = 0.1;
+      child.material.roughness = 0.8;
+      child.material.needsUpdate = true;
+    }
+  });
+  return clone;
+}
+
+function TerminalModel({ position }: { position: [number, number, number] }) {
+  const { scene } = useGLTF("/terminal_bandara_apt_pranoto.glb");
+  const model = useMemo(() => fixGLB(scene), [scene]);
+  return (
+    <group position={position}>
+      <primitive
+        object={model}
+        scale={0.4}
+        rotation={[-Math.PI / 2, 0, THREE.MathUtils.degToRad(-90)]}
+      />
+      <Text
+        position={[0, 10, 0]}
+        fontSize={2}
+        color="white"
+        outlineWidth={0.2}
+        outlineColor="black"
+      >
+        TERMINAL
+      </Text>
+    </group>
+  );
+}
+
+function TowerATCModel({ position }: { position: [number, number, number] }) {
+  const { scene } = useGLTF("/tower_atc_model.glb");
+  const model = useMemo(() => fixGLB(scene), [scene]);
+  return (
+    <group position={position}>
+      <primitive object={model} scale={1.1} rotation={[-Math.PI / 2, 0, 0]} />
+      <Text
+        position={[0, 14, 0]}
+        fontSize={1.8}
+        color="white"
+        outlineWidth={0.2}
+        outlineColor="black"
+      >
+        TOWER
+      </Text>
+    </group>
+  );
+}
+
+function BMKGModel({ position }: { position: [number, number, number] }) {
+  const { scene } = useGLTF("/kantor_bmkg_apt_pranoto.glb");
+  const model = useMemo(() => fixGLB(scene), [scene]);
+  return (
+    <group position={position}>
+      <primitive
+        object={model}
+        scale={0.4}
+        rotation={[-Math.PI / 2, 0, THREE.MathUtils.degToRad(90)]}
+      />
+      <Text
+        position={[0, 5, 0]}
+        fontSize={1.8}
+        color="white"
+        outlineWidth={0.2}
+        outlineColor="black"
+      >
+        BMKG
+      </Text>
+    </group>
+  );
+}
+
+function PertaminaModel({ position }: { position: [number, number, number] }) {
+  const { scene } = useGLTF("/pertamina_apt_pranoto.glb");
+  const model = useMemo(() => fixGLB(scene), [scene]);
+  return (
+    <group position={position}>
+      <primitive
+        object={model}
+        scale={0.3}
+        rotation={[-Math.PI / 2, 0, THREE.MathUtils.degToRad(90)]}
+      />
+      <Text
+        position={[0, 5, 0]}
+        fontSize={1.2}
+        color="white"
+        outlineWidth={0.2}
+        outlineColor="red"
+      >
+        PERTAMINA
+      </Text>
+    </group>
+  );
+}
+
+function FireStationModel({
+  position,
+}: {
+  position: [number, number, number];
+}) {
+  const { scene } = useGLTF("/fire_station_apt_pranoto.glb");
+  const model = useMemo(() => fixGLB(scene), [scene]);
+  return (
+    <group position={position}>
+      <primitive
+        object={model}
+        scale={0.3}
+        rotation={[-Math.PI / 2, 0, THREE.MathUtils.degToRad(-90)]}
+      />
+      <Text
+        position={[0, 5, 0]}
+        fontSize={1.2}
+        color="white"
+        outlineWidth={0.2}
+        outlineColor="black"
+      >
+        FIRE STATION
+      </Text>
+    </group>
+  );
+}
 
 // TOWER AWOS
 function AwosTower({
@@ -352,7 +462,6 @@ function Wind3DParticles({
 
       p.x += Math.sin(toRad) * velocity;
       p.z -= Math.cos(toRad) * velocity;
-
       let currentY = p.baseY;
 
       if (Math.abs(p.x) > 200 || Math.abs(p.z) > 200) {
@@ -495,10 +604,7 @@ export default function Scene3D({
   return (
     <div className="absolute inset-0 z-0">
       <Canvas camera={{ position: [0, 80, 150], fov: 50 }}>
-        {/* Matikan OrbitControls jika Drone sedang aktif */}
         {!droneMode && <CameraController resetTrigger={resetCameraTrigger} />}
-
-        {/* Render Drone HANYA jika droneMode aktif */}
         {droneMode && <DroneInspector awosData={awosData} />}
 
         <CompassHUD />
@@ -615,87 +721,31 @@ export default function Scene3D({
             label="AWOS 04"
           />
 
-          {/* TAXIWAY 1 */}
+          {/* TAXIWAY */}
           <mesh position={[12, 0.04, -10]}>
             <boxGeometry args={[12, 0.08, 6]} />
             <meshStandardMaterial color="#37474f" />
           </mesh>
-
-          {/* TAXIWAY 2 */}
           <mesh position={[12, 0.04, -105]}>
             <boxGeometry args={[12, 0.08, 6]} />
             <meshStandardMaterial color="#37474f" />
           </mesh>
-
-          {/* APRON */}
           <mesh position={[24, 0.04, -57.5]}>
             <boxGeometry args={[12, 0.08, 100]} />
             <meshStandardMaterial color="#455a64" />
           </mesh>
 
-          {/* TERMINAL */}
-          <group position={[40, 0, -90]}>
-            <mesh position={[0, 4, 0]}>
-              <boxGeometry args={[14, 8, 30]} />
-              <meshStandardMaterial color="#cfd8dc" />
-            </mesh>
-            <Text
-              position={[0, 10, 0]}
-              fontSize={2}
-              color="white"
-              outlineWidth={0.2}
-              outlineColor="black"
-            >
-              TERMINAL
-            </Text>
-          </group>
-
-          {/* TOWER ATC */}
-          <group position={[40, 0, -45]}>
-            <mesh position={[0, 8, 0]}>
-              <cylinderGeometry args={[1.4, 2, 16, 8]} />
-              <meshStandardMaterial color="#fafafa" />
-            </mesh>
-            <mesh position={[0, 16.5, 0]}>
-              <cylinderGeometry args={[3, 2, 3, 8]} />
-              <meshStandardMaterial color="#29b6f6" />
-            </mesh>
-            <Text
-              position={[0, 19, 0]}
-              fontSize={2}
-              color="white"
-              outlineWidth={0.2}
-              outlineColor="black"
-            >
-              TOWER
-            </Text>
-          </group>
-
-          {/* BMKG OFFICE */}
-          <group position={[40, 0, -30]}>
-            <mesh position={[0, 2.5, 0]}>
-              <boxGeometry args={[10, 5, 10]} />
-              <meshStandardMaterial color="#e0e0e0" />
-            </mesh>
-            <mesh position={[0, 5.2, 0]}>
-              <cylinderGeometry args={[1.5, 1.5, 1.2, 16]} />
-              <meshStandardMaterial color="#0288d1" />
-            </mesh>
-            <Text
-              position={[0, 7, 0]}
-              fontSize={2}
-              color="white"
-              outlineWidth={0.2}
-              outlineColor="black"
-            >
-              BMKG
-            </Text>
-          </group>
+          {/* === CUSTOM GLB MODELS === */}
+          <TerminalModel position={[40, 0, -90]} />
+          <TowerATCModel position={[40, 0, -45]} />
+          <BMKGModel position={[40, 0.1, -30]} />
+          <PertaminaModel position={[48, 0.1, 15]} />
+          <FireStationModel position={[32, 0.1, 15]} />
 
           {/* DANAU */}
           <group position={[45, 0.1, -5]}>
             <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[14, 32]} />
+              <circleGeometry args={[10, 25]} />
               <meshStandardMaterial
                 color="#3498db"
                 roughness={0.1}
@@ -712,54 +762,16 @@ export default function Scene3D({
               LAKE
             </Text>
           </group>
-
-          {/* DEPO PERTAMINA */}
-          <group position={[48, 0, 15]}>
-            <mesh position={[-2.5, 2, 0]}>
-              <cylinderGeometry args={[2.5, 2.5, 4, 16]} />
-              <meshStandardMaterial color="#ffffff" />
-            </mesh>
-            <mesh position={[2.5, 2, 0]}>
-              <cylinderGeometry args={[2.5, 2.5, 4, 16]} />
-              <meshStandardMaterial color="#ffffff" />
-            </mesh>
-            <Text
-              position={[0, 5, 0]}
-              fontSize={1.2}
-              color="white"
-              outlineWidth={0.2}
-              outlineColor="red"
-            >
-              PERTAMINA
-            </Text>
-          </group>
-
-          {/* AIRPORT FIRE STATION */}
-          <group position={[32, 0, 15]}>
-            <mesh position={[0, 2.5, 0]}>
-              <boxGeometry args={[12, 5, 8]} />
-              <meshStandardMaterial color="#c0392b" />
-            </mesh>
-            <mesh position={[-3, 1.8, -4.1]}>
-              <planeGeometry args={[2.5, 3.5]} />
-              <meshBasicMaterial color="#2d3436" />
-            </mesh>
-            <mesh position={[3, 1.8, -4.1]}>
-              <planeGeometry args={[2.5, 3.5]} />
-              <meshBasicMaterial color="#2d3436" />
-            </mesh>
-            <Text
-              position={[0, 6, 0]}
-              fontSize={1.2}
-              color="white"
-              outlineWidth={0.2}
-              outlineColor="black"
-            >
-              FIRE STATION
-            </Text>
-          </group>
         </group>
       </Canvas>
     </div>
   );
 }
+
+// Pre-load all GLB models
+useGLTF.preload("/drone.glb");
+useGLTF.preload("/terminal_bandara_apt_pranoto.glb");
+useGLTF.preload("/tower_atc_model.glb");
+useGLTF.preload("/kantor_bmkg_apt_pranoto.glb");
+useGLTF.preload("/pertamina_apt_pranoto.glb");
+useGLTF.preload("/fire_station_apt_pranoto.glb");
