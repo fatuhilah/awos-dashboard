@@ -736,7 +736,7 @@ export default function Scene3D({
           </mesh>
 
           {/* === CUSTOM GLB MODELS === */}
-          <TerminalModel position={[40, 0, -90]} />
+          <TerminalModel position={[40, -0.1, -90]} />
           <TowerATCModel position={[40, 0, -45]} />
           <BMKGModel position={[40, 0.1, -30]} />
           <PertaminaModel position={[48, 0.1, 15]} />
