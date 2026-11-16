@@ -4,51 +4,88 @@ import { useEffect, useState } from "react";
 import Scene3D from "../components/Scene3D";
 
 const SUPABASE_URL = `${process.env.NEXT_PUBLIC_AWOS_SUPABASE_URL}/rest/v1/awos_data?select=*&order=id.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_AWOS_SUPABASE_ANON_KEY}`;
-const LOGGER_URL = `${process.env.NEXT_PUBLIC_ASRS_LOGGER_SUPABASE_URL}/rest/v1/logger_data?select=*&order=received_at.desc&limit=1&apikey=${process.env.NEXT_PUBLIC_ASRS_LOGGER_SUPABASE_ANON_KEY}`;
+
+const INITIAL_RUNWAY_DATA = {
+  wd: "-",
+  ws: "-",
+  wgd: "-",
+  wgs: "-",
+  temp: "-",
+  dewp: "-",
+  rh: "-",
+  qnh: "-",
+  da: "-",
+  rain: "-",
+  vis: "-",
+  rvr: "-",
+  sky: "-",
+  pw: "-",
+  ltx: "",
+};
+
+const INITIAL_MID_DATA = {
+  wd: "-",
+  ws: "-",
+  wgd: "-",
+  wgs: "-",
+  temp: "-",
+  dewp: "-",
+  rh: "-",
+  qnh: "-",
+  da: "-",
+  rain: "-",
+  sol: "-",
+  ltx: "",
+};
+
+const DataItem = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) => (
+  <div className="flex flex-col">
+    <span className="text-[9px] text-gray-400 uppercase tracking-wider">
+      {label}
+    </span>
+    <span className="font-mono text-sm">{value}</span>
+  </div>
+);
+
 export default function Home() {
   const [droneMode, setDroneMode] = useState(false);
-  const [awosData, setAwosData] = useState<any>({
-    site04: {},
-    mid: {},
-    site22: {},
-    lastUpdate: "Menghubungkan ke database AWOS...",
-    hour: 12,
-  });
-
-  const [sunshineDur, setSunshineDur] = useState<number | string>("-");
-  const fetchLoggerData = async () => {
-    try {
-      const res = await fetch(LOGGER_URL);
-      const data = await res.json();
-      if (data && data.length > 0) {
-        setSunshineDur(data[0].sunshine_dur);
-      }
-    } catch (error) {
-      console.error("Gagal mengambil data logger:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    fetchLoggerData();
-    const interval = setInterval(() => {
-      fetchData();
-      fetchLoggerData();
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const [resetCamera, setResetCamera] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [awosData, setAwosData] = useState<any>({
+    site04: INITIAL_RUNWAY_DATA,
+    mid: INITIAL_MID_DATA,
+    site22: INITIAL_RUNWAY_DATA,
+    lastUpdate: "Menghubungkan ke database AWOS...",
+    isLoaded: false,
+    hour: 12,
+  });
 
   const fetchData = async () => {
     try {
       const res = await fetch(SUPABASE_URL);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
 
       if (data && data.length > 0) {
         const latest = data[0];
         const dateObj = new Date(latest.received_at);
+
+        const witaHour = Number(
+          new Intl.DateTimeFormat("en-US", {
+            hour: "numeric",
+            hourCycle: "h23",
+            timeZone: "Asia/Makassar",
+          }).format(dateObj),
+        );
 
         setAwosData({
           site04: {
@@ -103,8 +140,10 @@ export default function Home() {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
+            timeZone: "Asia/Makassar",
           }),
-          hour: dateObj.getHours(),
+          isLoaded: true,
+          hour: Number.isNaN(witaHour) ? dateObj.getHours() : witaHour,
         });
       }
     } catch (error) {
@@ -118,24 +157,14 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const DataItem = ({
-    label,
-    value,
-  }: {
-    label: string;
-    value: string | number;
-  }) => (
-    <div className="flex flex-col">
-      <span className="text-[9px] text-gray-400 uppercase tracking-wider">
-        {label}
-      </span>
-      <span className="font-mono text-sm">{value}</span>
-    </div>
-  );
+  const activeLtx = [
+    awosData.site04?.ltx,
+    awosData.mid?.ltx,
+    awosData.site22?.ltx,
+  ].filter((val) => typeof val === "string" && val.includes("LTG"));
 
-  const combinedLtx =
-    awosData.mid?.ltx || awosData.site04?.ltx || awosData.site22?.ltx || "";
-  const hasLightning = combinedLtx.includes("LTG");
+  const hasLightning = activeLtx.length > 0;
+  const combinedLtx = activeLtx.join(" | ");
 
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-black">
@@ -156,7 +185,10 @@ export default function Home() {
                 AWOS DASHBOARD
               </h1>
               <div className="flex items-center gap-3 text-xs text-gray-300 font-mono mt-1">
-                <p>UPDATE: {awosData.lastUpdate} WITA</p>
+                <p>
+                  UPDATE: {awosData.lastUpdate}
+                  {awosData.isLoaded ? " WITA" : ""}
+                </p>
 
                 {/* Indikator LIVE Modern (Biru) */}
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.2)]">
@@ -194,16 +226,6 @@ export default function Home() {
                   &gt;20
                 </div>
               </div>
-            </div>
-
-            {/* SUNSHINE DURATION*/}
-            <div className="-ml-2 bg-black/50 backdrop-blur-md border border-white/10 p-3 rounded-2xl flex items-center gap-3">
-              <p className="text-[12px] text-gray-300 uppercase">
-                Sunshine Duration
-              </p>
-              <span className="font-mono text-sm font-bold text-yellow-400">
-                {sunshineDur}
-              </span>
             </div>
           </div>
 
@@ -302,7 +324,7 @@ export default function Home() {
               <DataItem label="QNH" value={`${awosData.mid.qnh} hPa`} />
               <DataItem label="D. ALT" value={`${awosData.mid.da} ft`} />
               <div className="col-span-3">
-                <DataItem label="LIGHTNING" value={awosData.mid.ltx} />
+                <DataItem label="LIGHTNING" value={awosData.mid.ltx || "-"} />
               </div>
             </div>
           </div>
